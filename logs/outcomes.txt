@@ -1,0 +1,8 @@
+1,RandomPlayer,RandomPlayer,GAMEOVER DRAW,NOBODY,54,game00001.log,
+2,RandomPlayer,RandomPlayer,GAMEOVER DRAW,NOBODY,54,game00002.log,
+3,RandomPlayer,Human,GAMEOVER DRAW,NOBODY,54,game00003.log,
+4,RandomPlayer,Human,0,RandomPlayer,5,game00004.log,DISCONNECTION Player-1
+5,RandomPlayer,Human,0,RandomPlayer,43,game00005.log,ILLEGAL MOVE: Player 1, CardUsed: (Map), PosOfUse: (12, 3)
+6,RandomPlayer,Human,GAMEOVER DRAW,NOBODY,54,game00006.log,
+7,RandomPlayer,Human,1,Human,18,game00007.log,
+8,RandomPlayer,Human,0,RandomPlayer,19,game00008.log,
