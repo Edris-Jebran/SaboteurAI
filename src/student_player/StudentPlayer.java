@@ -26,10 +26,10 @@ public class StudentPlayer extends SaboteurPlayer {
         // You probably will make separate functions in MyTools.
         // For example, maybe you'll need to load some pre-processed best opening
         // strategies...
-        MyTools.getSomething();
+        MyTools.getSomething(); //TODO: implement tools if necessary
 
         // Is random the best you can do?
-        Move myMove = boardState.getRandomMove();
+        Move myMove = Tree.searchForMove(boardState);
 
         // Return your move to be processed by the server.
         return myMove;
