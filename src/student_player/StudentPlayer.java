@@ -27,7 +27,7 @@ public class StudentPlayer extends SaboteurPlayer {
         // For example, maybe you'll need to load some pre-processed best opening
         // strategies...
         MyTools.getSomething(); //TODO: implement tools if necessary
-
+        System.out.println("Student player acting as player number: "+boardState.getTurnPlayer());
         // Is random the best you can do?
         Move myMove = Tree.searchForMove(boardState);
 
