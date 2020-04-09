@@ -3,7 +3,12 @@ package student_player;
 import boardgame.Move;
 
 import Saboteur.SaboteurPlayer;
+
+import java.util.ArrayList;
+
 import Saboteur.SaboteurBoardState;
+import Saboteur.SaboteurMove;
+import java.math.*;
 
 /** A player file submitted by a student. */
 public class StudentPlayer extends SaboteurPlayer {
@@ -23,13 +28,19 @@ public class StudentPlayer extends SaboteurPlayer {
      * make decisions.
      */
     public Move chooseMove(SaboteurBoardState boardState) {
-        // You probably will make separate functions in MyTools.
-        // For example, maybe you'll need to load some pre-processed best opening
-        // strategies...
-        MyTools.getSomething(); //TODO: implement tools if necessary
+       
         System.out.println("Student player acting as player number: "+boardState.getTurnPlayer());
-        // Is random the best you can do?
-        Move myMove = Tree.searchForMove(boardState);
+        
+        // get all legal moves and choose the best
+        ArrayList<SaboteurMove> legal_moves = boardState.getAllLegalMoves();
+        int x = 0;
+        
+        for(SaboteurMove m: legal_moves) {
+        	System.out.println("move "+x+" "+m.toPrettyString());
+        	x++;
+        }
+       
+        Move myMove = legal_moves.get((int)(legal_moves.size() * Math.random()));
 
         // Return your move to be processed by the server.
         return myMove;

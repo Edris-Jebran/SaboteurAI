@@ -6,3 +6,6 @@
 6,RandomPlayer,Human,GAMEOVER DRAW,NOBODY,54,game00006.log,
 7,RandomPlayer,Human,1,Human,18,game00007.log,
 8,RandomPlayer,Human,0,RandomPlayer,19,game00008.log,
+13,RandomPlayer,260742799,0,RandomPlayer,1,game00013.log,DISCONNECTION Player-1
+14,RandomPlayer,260742799,GAMEOVER DRAW,NOBODY,56,game00014.log,
+15,RandomPlayer,260742799,GAMEOVER DRAW,NOBODY,56,game00015.log,
