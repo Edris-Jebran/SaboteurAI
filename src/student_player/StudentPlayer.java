@@ -49,6 +49,7 @@ public class StudentPlayer extends SaboteurPlayer {
         ArrayList<SaboteurCard> hand = bS.getCurrentPlayerCards(); //TODO: necessary?
         ArrayList<SaboteurMove> legalMoves = bS.getAllLegalMoves();
         SaboteurTile[][] hiddenBoard = bS.getHiddenBoard();
+        int[][] hiddenIntBoard = bS.getHiddenIntBoard();
 
         //TODO: should the be function calls or replaced with function body?
         boolean[] playerHiddenRevealed = getHiddenRevealed(bS, hiddenBoard);
@@ -58,11 +59,12 @@ public class StudentPlayer extends SaboteurPlayer {
         double[] optimalTile = getMinDistance(legalMoves); //Move index, Cost of Move
         double distanceToGoal = optimalTile[1];
 
-        if(distanceToGoal < THRESHOLD_DISTANCE){
-            for(int[] row : bS.getHiddenIntBoard()) {
-                System.out.println(Arrays.toString(row)); //TODO: remove + remove import of Arrays
-            }
+        //if(distanceToGoal < THRESHOLD_DISTANCE){
+        System.out.println("\n printing HIDDEN INT BOARD");
+        for(int[] row : hiddenIntBoard) {
+            System.out.println(Arrays.toString(row)); //TODO: remove + remove import of Arrays
         }
+        //}
 
         /* 1 Map Heuristic:
          * If distance to goal/middle is over some threshold + don't already know nugget location
@@ -123,6 +125,7 @@ public class StudentPlayer extends SaboteurPlayer {
         int moveIndex = (int) optimalTile[0];
         if (moveIndex>=0) { //Note: necessary because of edge case when no tile cards in deck
             myMove = legalMoves.get((int) optimalTile[0]); //new SaboteurMove(card,0,0,player_id);
+            MyTools.Graph g = new MyTools.Graph(10,hiddenIntBoard, hiddenBoard);
             logging(START_TIME);
             return getLegalMove(bS, myMove); //ISSUE: if for some reason this isn't a legal move it'll return a random card
         }
@@ -141,6 +144,7 @@ public class StudentPlayer extends SaboteurPlayer {
 
     }
 
+    //TODO: maybe return mincost + ORDERED list of moves.
     private double[] getMinDistance(ArrayList<SaboteurMove> legalMoves){
         double[] retVal = new double[2];// index of move, cost
         double minCost=0;
