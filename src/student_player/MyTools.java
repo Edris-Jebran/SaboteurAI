@@ -1,46 +1,237 @@
 package student_player;
 
 import Saboteur.SaboteurBoardState;
+import Saboteur.SaboteurMove;
+import Saboteur.cardClasses.SaboteurCard;
 import Saboteur.cardClasses.SaboteurTile;
 import java.util.*;  //TODO: REMOVE
 
 public class MyTools {
     public static class Graph {
         private ArrayList<ArrayList<Integer> > adj;
-        private ArrayList<Integer> srcNodeIndices;
-        private ArrayList<Integer> targetNodeIndices;
+        private int srcTileNum=75;
+
+        private int nodeCount;
+        private int[][] hiddenIntBoard;
+        //hashmap: Key = tile#; Value = int[4]{left,up,right,down} where each represents the adj index of the tile default = -1 for no tile
+        private TreeMap<Integer, int[]> tileNeighbourhood = new TreeMap<Integer, int[]>();
 
         // A utility function to add an edge in an
         // undirected graph
         void addEdge(int u, int v){
-            this.adj.get(u).add(v);
-            this.adj.get(v).add(u);
+            if(!this.adj.get(u).contains(v)) this.adj.get(u).add(v);
+            if(!this.adj.get(v).contains(u)) this.adj.get(v).add(u);
         }
 
-        void removeEdge(int u, int v){
-            this.adj.get(u).remove(v);
-            this.adj.get(v).remove(u);
-        }
+        /**
+         * Temporarily add tile to graph, Can only have 1 overlaid targetNode
+         * Thus remove any previously addedTiles
+         * @param tileIdx
+         * @param tileNumber
+         * @return ordered position of nodes within subgraph i.e. [left,up,right,down]
+         */
+        private void addTile(String tileIdx, int tileNumber ){ //TODO
+            boolean isHiddenTile=false;
+            int i = tileNumber/SaboteurBoardState.BOARD_SIZE; // gives tile x(row) position
+            int j = tileNumber%SaboteurBoardState.BOARD_SIZE; // gives tile y(col) position
 
-        void addTile(int targetTile ){ //TODO
-            if(this.targetNodeIndices.size() > 0){
-                removeTargetNodes();
+            System.out.println("\t Tile: "+tileIdx);
+            if( i == SaboteurBoardState.originPos && j == SaboteurBoardState.originPos){
+                this.srcTileNum = tileNumber;
+            }else if(tileIdx.equals("nugget") || tileIdx.equals("hidden1") || tileIdx.equals("hidden2")){
+                System.out.println("Hidden Tile: " + tileIdx);
+                isHiddenTile = true;
             }
-            this.targetNodeIndices = new ArrayList<Integer>(4);
+            boolean isConnected = false;
+            int[] tileNodes = new int[]{-1,-1,-1,-1}; //left,up,right,down
+            //Loop through path of a given tile
+            for (int h = 0; h < 3; h++) {
+                for (int k = 0; k < 3; k++) {
+                    if((this.hiddenIntBoard[i * 3 + h][j * 3 + k] == SaboteurBoardState.TUNNEL) || isHiddenTile){//NODE
+                        System.out.println("\t \t H: "+h+"\t K: "+k);
+                        if(h==1 && k==1){ //CENTER CENTER
+                            isConnected = true; //Only connected if center of tile is a tunnel
+                            continue;
+                        }else if(h==0 && k==1){ //TOP CENTER
+                            tileNodes[1] = this.nodeCount;
+                        }else if(h==1) { //CENTER LEFT
+                            tileNodes[k] = this.nodeCount;
+                        }else if(h==2 && k==1) { //BOTTOM CENTER
+                            tileNodes[3] = this.nodeCount;
+                        }else{
+                            continue; //TODO: investigate necessity
+                        }
+                        System.out.println("\t Node #"+this.nodeCount+" @ Tile #: "+(SaboteurBoardState.BOARD_SIZE*i + j));
+
+                        this.adj.add(new ArrayList<Integer>(4));
+                        this.nodeCount++;
+                    }
+                }
+            }
+            System.out.println("Tile #: "+(tileNumber)+" with nodes at " +Arrays.toString(tileNodes) );
+            if(isConnected){ //add strongly connected internal edges
+                for(int a=0; a<3; a++){
+                    if(tileNodes[a] == -1) continue;
+                    for(int b=a+1; b<4; b++){
+                        if(tileNodes[b] == -1) continue;
+                        addEdge(tileNodes[a], tileNodes[b]);
+                    }
+                }
+            }
+            this.tileNeighbourhood.put(tileNumber,tileNodes);
         }
 
-        void removeTargetNodes(){// TODO
+        private void connectTile(int tileNumber){
+            int i = tileNumber/SaboteurBoardState.BOARD_SIZE; // gives tile x(row) position
+            int j = tileNumber%SaboteurBoardState.BOARD_SIZE; // gives tile y(col) position
+
+            int[] neighbourhood = this.tileNeighbourhood.get(tileNumber);
+            System.out.println("Tile #"+tileNumber+" has Neighbourhood = #: "+Arrays.toString(neighbourhood));
+            int[] neighbour; //left,up,right,down
+            if(neighbourhood[2] != -1 && (j+1)%SaboteurBoardState.BOARD_SIZE > 0){ //exists position to the right and subgraph contains path to right
+                neighbour = this.tileNeighbourhood.get(tileNumber+1);
+                System.out.println("\t Right neighbour " + Arrays.toString(neighbour));
+                if(neighbour != null && neighbour[0] != -1 ){ //next tile is indeed to the right of current position and has path leftwards
+                    System.out.println("\t \t (right) edges: "+neighbourhood[2]+", "+neighbour[0]);
+                    addEdge(neighbourhood[2],neighbour[0]);
+                }
+            }
+            if(neighbourhood[3] != -1 && i+1 < SaboteurBoardState.BOARD_SIZE){//exists a tile and path to the bottom position that might be connected
+                neighbour = this.tileNeighbourhood.get(tileNumber+SaboteurBoardState.BOARD_SIZE);
+                System.out.println("\t Bottom neighbour " + Arrays.toString(neighbour));
+                if(neighbour != null && neighbour[1] != -1){ //tile beneath has been paved and contains path upwards
+                    System.out.println("\t \t (below) Nodes: "+neighbourhood[3]+", "+neighbour[1]);
+                    addEdge(neighbourhood[3],neighbour[1]);
+                }
+            }
+        }
+
+
+        void removeTargetTile(int targetTileNum){
             ArrayList<Integer> neighbours = new ArrayList<Integer>();
-            //for(target : targetNodeIndices);
+            int[] tileNodes = this.tileNeighbourhood.get(targetTileNum);
+            for(int tn : tileNodes) neighbours.add(tn);
+
+            //1. remove external edges to tileNodes
+            for(int i=0; i<this.adj.size(); i++){
+                int finalI = i;
+                if (Arrays.stream(tileNodes).anyMatch(j -> j == finalI)) continue; //skip internal nodes
+                this.adj.get(i).removeAll(neighbours);
+            }
+            //2. remove internal nodes
+            for(int n : neighbours){
+                if(n == -1) continue;
+                this.adj.remove(this.adj.size()-1);
+                this.nodeCount--;
+            }
+            this.tileNeighbourhood.remove(targetTileNum);
         }
 
-        public boolean pathToOrigin(int targetTile){ //TODO
-            boolean pathExists = false;
-            return pathExists;
+        /**
+         *
+         * @param targetTile
+         * @return
+         */
+        private boolean pathToOrigin(int targetTile){
+            int[] srcNodes = this.tileNeighbourhood.get(this.srcTileNum); //l,u,r,d
+            int[] goalNodes = this.tileNeighbourhood.get(targetTile); //l,u,r,d
+            Stack<Integer> nodeStack = new Stack<>();
+            ArrayList<Integer> visitedNodes = new ArrayList<>();
+
+            for(int srcNode : srcNodes) {
+                if (srcNode == -1) continue;
+                nodeStack.push(srcNode);
+            }
+
+            while(!nodeStack.isEmpty()){
+                int curr = nodeStack.pop();
+                if(Arrays.stream(goalNodes).anyMatch(i -> i == curr)) return true; // curr is one of any of the goal nodes
+
+                visitedNodes.add(curr);
+                for (int a : this.adj.get(curr)){
+                    if(!visitedNodes.contains(a)) nodeStack.add(a);
+                }
+            }
+            return false;
         }
-//        public double analyse(SaboteurMove move){ TODO
-//            int targetTile =
-//        }
+
+        /**
+         * Given a move determine return the minimum score of its resultant neighbours
+
+         * @param move
+         * @return
+         */
+        public double analyse(SaboteurMove move){ //TODO
+            SaboteurTile card = (SaboteurTile) move.getCardPlayed();
+            String tileIdx = card.getIdx();
+            int[] pos = move.getPosPlayed();
+            int targetTileNum = SaboteurBoardState.BOARD_SIZE*pos[0]+pos[1];
+
+            double minNeighbourCost = -1;
+
+            int x = targetTileNum/SaboteurBoardState.BOARD_SIZE; // gives tile x(row) position
+            int y = targetTileNum%SaboteurBoardState.BOARD_SIZE; // gives tile y(col) position
+            //1. Add tile to graph + Connect tile
+            for (int k = 0; k < 3; k++) { //Temporarily update hiddenIntBoard
+                for (int h = 0; h < 3; h++) {
+                    this.hiddenIntBoard[pos[0] * 3 + k][pos[1] * 3 + h] = card.getPath()[h][2-k];
+                }
+            }
+            addTile(tileIdx,targetTileNum);
+            if(this.tileNeighbourhood.containsKey(targetTileNum-1)) connectTile(targetTileNum-1);
+            if(this.tileNeighbourhood.containsKey(targetTileNum-SaboteurBoardState.BOARD_SIZE)) connectTile(targetTileNum-SaboteurBoardState.BOARD_SIZE);
+            connectTile(targetTileNum);
+
+            //2. Verify at least 1 of the move tile nodes in the graph are reachable from one of the source nodes (i.e. valid path)
+            if(!pathToOrigin(targetTileNum)){
+                System.out.println("\t ERROR: unable to find path to origin for prospective move");
+                return minNeighbourCost;
+            }
+
+            //3. look at nodes within tile and determine W= minimum weight of neighbouring positions according to positionDistances
+            int[] targetNodes = this.tileNeighbourhood.get(targetTileNum);//l,u,r,p
+            System.out.println("\t \t TARGET NODES: "+Arrays.toString(targetNodes));
+            double score = -1;
+            for(int i=0; i<targetNodes.length; i++){
+                int n = targetNodes[i];
+                if(n == -1) continue;
+                System.out.println("\t \t \t Analysing NODES: "+n);
+                try {
+                    char remove; //TODO: REMOVE
+                    if (i == 0 && !this.tileNeighbourhood.containsKey(targetTileNum - 1)) { //l
+                        score = positionDistances[x][y - 1];
+                        remove='l';
+                    } else if (i == 1 && !this.tileNeighbourhood.containsKey(targetTileNum - SaboteurBoardState.BOARD_SIZE)) {//u
+                        score = positionDistances[x-1][y];
+                        remove='u';
+                    } else if (i == 2 && !this.tileNeighbourhood.containsKey(targetTileNum + 1)) {//r
+                        score = positionDistances[x][y + 1];
+                        remove='r';
+                    } else if (i == 3 && !this.tileNeighbourhood.containsKey(targetTileNum + SaboteurBoardState.BOARD_SIZE)) {//d
+                        score = positionDistances[x+1][y];
+                        remove='d';
+                    } else{
+                        continue;
+                    }
+                    System.out.println("\t \t \t SCORE @"+remove+" is: "+score);
+                    if(minNeighbourCost==-1 || score<minNeighbourCost){
+                        minNeighbourCost=score;
+                    }
+                } catch(ArrayIndexOutOfBoundsException ex){
+                    System.out.println("Caught error in analysis");
+                }
+            }
+
+            //4. Remove tile + undo temporary changes to hiddenIntBoard
+            for (int k = 0; k < 3; k++) {
+                for (int h = 0; h < 3; h++) {
+                    this.hiddenIntBoard[pos[0] * 3 + k][pos[1] * 3 + h] = SaboteurBoardState.EMPTY;
+                }
+            }
+            removeTargetTile(targetTileNum);
+            System.out.println("\t \t \t MIN SCORE is: "+minNeighbourCost);
+            return minNeighbourCost; //W
+        }
 
         // A utility function to print the adjacency list
         // representation of graph
@@ -59,18 +250,11 @@ public class MyTools {
 
         public Graph(int numTiles, int[][] hiddenIntBoard, SaboteurTile[][] hiddenBoard){
              this.adj = new ArrayList<ArrayList<Integer> >(numTiles*4);
-             this.srcNodeIndices = new ArrayList<Integer>(4);
-             this.targetNodeIndices = new ArrayList<Integer>(4);
+             this.nodeCount = 0;
+             this.hiddenIntBoard = hiddenIntBoard;
 
-             //hashmap: Key = tile#; Value = int[4]{left,up,right,down} where each represents the adj index of the tile default = -1 for no tiel
-             TreeMap<Integer, int[]> tileNeighbourhood = new TreeMap<Integer, int[]>();
-             /*TODO:
-                Pass #1 build internal subgraphs
-                Pass #2 build links between subgraphs
-              */
 
-             boolean isOriginTile = false;
-             int tileCount=0, nodeCount=0;
+             int tileCount=0;//, nodeCount=0;
             //1. Build internal subgraphs by looping through tiles
              for (int i = 0; i < SaboteurBoardState.BOARD_SIZE; i++) {
                 for (int j = 0; j < SaboteurBoardState.BOARD_SIZE; j++) {
@@ -79,81 +263,14 @@ public class MyTools {
                         continue;
                     }
                     String tileIdx = hiddenBoard[i][j].getIdx();
-                    System.out.println("\t Tile: "+tileIdx);
-                    boolean isHiddenTile=false;
-                    if( i == SaboteurBoardState.originPos && j == SaboteurBoardState.originPos){
-                        isOriginTile = true;
-                        System.out.println("origin");
-                    }else if(tileIdx.equals("nugget") || tileIdx.equals("hidden1") || tileIdx.equals("hidden2")){
-                        System.out.println("Hidden Tile: " + tileIdx);
-                        isHiddenTile = true;
-                    }
-                    boolean isConnected = false;
-                    int[] tileNodes = new int[]{-1,-1,-1,-1}; //left,up,right,down
-                    //Loop through path of a given tile
-                    for (int h = 0; h < 3; h++) {
-                        for (int k = 0; k < 3; k++) {
-                            if((hiddenIntBoard[i * 3 + h][j * 3 + k] == SaboteurBoardState.TUNNEL) || isHiddenTile){//NODE
-                                System.out.println("\t \t H: "+h+"\t K: "+k);
-                                if(h==1 && k==1){ //CENTER CENTER
-                                    isConnected = true; //Only connected if center of tile is a tunnel
-                                    continue;
-                                }else if(h==0 && k==1){ //TOP CENTER
-                                    tileNodes[1] = nodeCount;
-                                }else if(h==1) { //CENTER LEFT
-                                    tileNodes[k] = nodeCount;
-                                }else if(h==2 && k==1) { //BOTTOM CENTER
-                                    tileNodes[3] = nodeCount;
-                                }
-                                System.out.println("\t Node #"+nodeCount+" @ Tile #: "+(SaboteurBoardState.BOARD_SIZE*i + j));
-
-                                this.adj.add(new ArrayList<Integer>(4));
-                                if(isOriginTile) this.srcNodeIndices.add(nodeCount);
-                                nodeCount++;
-                            }
-                        }
-                    }
-                    System.out.println("Tile #: "+(SaboteurBoardState.BOARD_SIZE*i + j)+" with nodes at " +Arrays.toString(tileNodes) );
-                    if(isConnected){ //add strongly connected internal edges
-                        for(int a=0; a<3; a++){
-                            if(tileNodes[a] == -1) continue;
-                            for(int b=a+1; b<4; b++){
-                                if(tileNodes[b] == -1) continue;
-                                addEdge(tileNodes[a], tileNodes[b]);
-                            }
-                        }
-                    }
-                    isOriginTile = false;
-                    isHiddenTile = false;
-                    tileNeighbourhood.put(tileCount,tileNodes);
+                    addTile(tileIdx, tileCount);
                     tileCount++;
                 }
             }
 
              //2. Build links between subgraphs
-            for(int t : tileNeighbourhood.keySet()){ //for each tile
-                int i = t/SaboteurBoardState.BOARD_SIZE; // gives tile x(row) position
-                int j = t%SaboteurBoardState.BOARD_SIZE; // gives tile y(col) position
-                int[] neighbourhood = tileNeighbourhood.get(t);
-                System.out.println("Tile #"+t+" has Neighbourhood = #: "+Arrays.toString(neighbourhood));
-
-                int[] neighbour; //left,up,right,down
-                if(neighbourhood[2] != -1 && (j+1)%SaboteurBoardState.BOARD_SIZE > 0){ //exists position to the right and subgraph contains path to right
-                    neighbour = tileNeighbourhood.get(t+1);
-                    System.out.println("\t Right neighbour " + Arrays.toString(neighbour));
-                    if(neighbour != null && neighbour[0] != -1 ){ //next tile is indeed to the right of current position and has path leftwards
-                        System.out.println("\t \t (right) edges: "+neighbourhood[2]+", "+neighbour[0]);
-                        addEdge(neighbourhood[2],neighbour[0]);
-                    }
-                }
-                if(neighbourhood[3] != -1 && i+1 < SaboteurBoardState.BOARD_SIZE){//exists a tile and path to the bottom position that might be connected
-                    neighbour = tileNeighbourhood.get(t+SaboteurBoardState.BOARD_SIZE);
-                    System.out.println("\t Bottom neighbour " + Arrays.toString(neighbour));
-                    if(neighbour != null && neighbour[1] != -1){ //tile beneath has been paved and contains path upwards
-                        System.out.println("\t \t (below) Nodes: "+neighbourhood[3]+", "+neighbour[1]);
-                        addEdge(neighbourhood[3],neighbour[1]);
-                    }
-                }
+            for(int t : this.tileNeighbourhood.keySet()){ //for each tile
+                connectTile(t);
             }
             printGraph(); //TODO: REMOVE
         }
@@ -161,6 +278,8 @@ public class MyTools {
     }
 
     private Graph boardGraph;
+
+    private static double[][] positionDistances;
 
     public static double getSomething() {
         return Math.random();
@@ -196,6 +315,7 @@ public class MyTools {
         double[][] distances = new double[SaboteurBoardState.BOARD_SIZE][SaboteurBoardState.BOARD_SIZE];
         int[] target = {SaboteurBoardState.hiddenPos[1][0],SaboteurBoardState.hiddenPos[1][1]}; //x,y default center
         if(nugPos > -1){
+            System.out.println("NugPos IS: "+nugPos);
             target[0] = SaboteurBoardState.hiddenPos[nugPos][0];
             target[1] = SaboteurBoardState.hiddenPos[nugPos][1];
         }
@@ -204,6 +324,8 @@ public class MyTools {
                 distances[x][y] = 1.2*Math.abs(x-target[0]) + Math.abs(y-target[1]); //TODO tweek with distance calculation formula
             }
         }
+
+        positionDistances = distances;
         return distances;
     }
 

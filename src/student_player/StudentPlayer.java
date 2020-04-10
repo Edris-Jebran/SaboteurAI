@@ -8,8 +8,7 @@ import boardgame.Move;
 import Saboteur.SaboteurPlayer;
 import Saboteur.SaboteurBoardState;
 
-import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.*;
 
 /** A player file submitted by a student. */
 public class StudentPlayer extends SaboteurPlayer {
@@ -20,8 +19,15 @@ public class StudentPlayer extends SaboteurPlayer {
     private static final int TIME_LIMIT_MS = 2000;
     private static final int GRACE_PERIOD_MS = 1500; //TODO: is this necessary?
 
+    //private static String optTileIdx = "0,5,5_flip,6,6_flip,7,7_flip,8,9,9_flip,10";
+    private static String dropTileIdx = "1,2,2_flip,3,3_flip,4,4_flip,11,11_flip,12,12_flip,13,14,14_flip,15";
+    private ArrayList<SaboteurMove> dropMoves;
+
     private static final double THRESHOLD_DISTANCE = 3; //TODO: play to figure out optimal value
     private static final double DELTA = 0.5; //TODO: play to figure out optimal value
+
+    //Key = MoveCost; Value = ArrayList<Move> of moves with that cost
+    private TreeMap<Double, ArrayList<SaboteurMove>> legalMoveCosts;
 
     /**
      * You must modify this constructor to return your student number. This is
@@ -42,6 +48,11 @@ public class StudentPlayer extends SaboteurPlayer {
         final long START_TIME = System.currentTimeMillis();
         SaboteurMove myMove = bS.getRandomMove(); //DEFAULT
 
+
+        this.legalMoveCosts = new TreeMap<Double, ArrayList<SaboteurMove>>();
+        this.dropMoves = new ArrayList<SaboteurMove>();
+
+
         //1. Parse BS: goal state found? Cards in Hand?
         int player_id = bS.getTurnPlayer();
         int opp_id = 1 - player_id;
@@ -56,14 +67,18 @@ public class StudentPlayer extends SaboteurPlayer {
         int nuggetPos = getNuggetPosition(bS, hiddenBoard);
         distances = MyTools.getPositionDistances(nuggetPos);
 
-        double[] optimalTile = getMinDistance(legalMoves); //Move index, Cost of Move
-        double distanceToGoal = optimalTile[1];
-
-        //if(distanceToGoal < THRESHOLD_DISTANCE){
-        System.out.println("\n printing HIDDEN INT BOARD");
-        for(int[] row : hiddenIntBoard) {
-            System.out.println(Arrays.toString(row)); //TODO: remove + remove import of Arrays
+        getDistances(legalMoves);
+        double minDistanceToGoal;
+        try{
+            minDistanceToGoal = this.legalMoveCosts.firstKey();
+        } catch (NoSuchElementException ex) { //empty treemap
+            minDistanceToGoal = -1;
         }
+        //if(distanceToGoal < THRESHOLD_DISTANCE){
+//        System.out.println("\n printing HIDDEN INT BOARD");
+//        for(int[] row : hiddenIntBoard) {
+//            System.out.println(Arrays.toString(row)); //TODO: remove + remove import of Arrays
+//        }
         //}
 
         /* 1 Map Heuristic:
@@ -98,6 +113,8 @@ public class StudentPlayer extends SaboteurPlayer {
                     return getLegalMove(bS, myMove); //ISSUE: if for some reason this isn't a legal move it'll return a random card
                 }
             }
+            if(this.dropMoves.size() > 0) myMove = this.dropMoves.get(0);
+            return getLegalMove(bS, myMove);
         }
 
 
@@ -107,7 +124,7 @@ public class StudentPlayer extends SaboteurPlayer {
          * Blocks opponent allowing agent to place 2nd to last tile without opponent stealing last tile
          */
         int reqNumMalus = (nuggetPos == -1) ? 2:1; //if goal is nugget just need 1 malus, if goal is unknown center need 2 active
-        if(distanceToGoal < THRESHOLD_DISTANCE  && bS.getNbMalus(opp_id) < reqNumMalus) { //TODO: update statement on distance
+        if(minDistanceToGoal < THRESHOLD_DISTANCE  && bS.getNbMalus(opp_id) < reqNumMalus) { //TODO: update statement on distance
             for(SaboteurCard card : hand){
                 if(card instanceof SaboteurMalus){
                     myMove = new SaboteurMove(card,0,0,player_id);
@@ -122,18 +139,24 @@ public class StudentPlayer extends SaboteurPlayer {
          *  TODO: 2. ONCE selected board location, select tile via looking at maintaining path to origin.
          */
         // Return your move to be processed by the server.
-        int moveIndex = (int) optimalTile[0];
-        if (moveIndex>=0) { //Note: necessary because of edge case when no tile cards in deck
-            myMove = legalMoves.get((int) optimalTile[0]); //new SaboteurMove(card,0,0,player_id);
+        if (minDistanceToGoal != -1) { //Note: necessary because of edge case when no tile cards in deck
             MyTools.Graph g = new MyTools.Graph(10,hiddenIntBoard, hiddenBoard);
+            ArrayList<SaboteurMove> optimalDestMoves = this.legalMoveCosts.get(minDistanceToGoal);
+            //optimalDestMoves.addAll(this) TODO: investigate if should have more than just optimalDest
+            ArrayList<Double> optimalNextMoveCosts = new ArrayList<Double>();
+            for(SaboteurMove move : optimalDestMoves){
+                optimalNextMoveCosts.add(g.analyse(move));
+            }
+            System.out.println("ANALYSIS COMPLETE");
+            myMove = optimalDestMoves.get(optimalNextMoveCosts.indexOf(Collections.min(optimalNextMoveCosts)));
             logging(START_TIME);
             return getLegalMove(bS, myMove); //ISSUE: if for some reason this isn't a legal move it'll return a random card
         }
-        return getLegalMove(bS, myMove);
         /* X. Drop Heuristic:
          * TODO
          *  if found goal, drop any map cards
          */
+        if(this.dropMoves.size() > 0) myMove = this.dropMoves.get(0);
 
         /* X. Destroy Heuristic:
          * TODO: develop usage + resistance e.g. when to use and how to handle broken paths (affects tile heuristic)
@@ -141,30 +164,30 @@ public class StudentPlayer extends SaboteurPlayer {
          */
 
         //while (System.currentTimeMillis() - START_TIME < TIME_LIMIT_MS - GRACE_PERIOD_MS) {} //TODO: remove while loop and figure out best way to do timeout
-
+        return getLegalMove(bS, myMove);
     }
 
     //TODO: maybe return mincost + ORDERED list of moves.
-    private double[] getMinDistance(ArrayList<SaboteurMove> legalMoves){
-        double[] retVal = new double[2];// index of move, cost
-        double minCost=0;
-        int minIndex=-1, ctr = 0;
+    private void getDistances(ArrayList<SaboteurMove> legalMoves){
+        List<String> dropIdx = new ArrayList<String>(Arrays.asList(dropTileIdx.split(",")));
         for(SaboteurMove move : legalMoves){
             SaboteurCard card = move.getCardPlayed();
             if(card instanceof SaboteurTile){ //TODO: make sure the casting doesn't create an issue in getCardPlayed()
+                if(dropIdx.contains(((SaboteurTile) card).getIdx())){
+                    this.dropMoves.add(move);
+                    continue;
+                }
                 int[] pos = move.getPosPlayed();
                 double cost = distances[pos[0]][pos[1]];
-                if (minIndex < 0 || cost < minCost){
-                    minCost = cost;
-                    minIndex = ctr;
+                if (this.legalMoveCosts.containsKey(cost)){
+                    this.legalMoveCosts.get(cost).add(move);
+                }else{
+                    ArrayList<SaboteurMove> moves = new ArrayList<SaboteurMove>();
+                    moves.add(move);
+                    this.legalMoveCosts.put(cost,moves);
                 }
             }
-            ctr ++;
         }
-
-        retVal[0] = minIndex;
-        retVal[1] = minCost;
-        return retVal;
     }
 
     private static void logging(long START_TIME){
@@ -200,6 +223,7 @@ public class StudentPlayer extends SaboteurPlayer {
     	    int[] hiddenPos = SaboteurBoardState.hiddenPos[h];
     	    if("nugget".equals(hiddenBoard[hiddenPos[0]][hiddenPos[1]].getIdx())){
     	        nuggetPos = h;
+    	        System.out.println("!FOUND NUGGET AT POS = "+h);
     	        break;
             }
         }
