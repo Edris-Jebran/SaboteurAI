@@ -8,6 +8,7 @@ import Saboteur.SaboteurBoardState;
 import Saboteur.SaboteurMove;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.math.*;
 
 /** A player file submitted by a student. */
@@ -22,6 +23,8 @@ public class StudentPlayer extends SaboteurPlayer {
 	private static int goalPosition[] = {student_originPos+7,student_originPos}; // Initially set to the middle hidden tile, updated after map used
 	
 	private static ArrayList<SaboteurMove> expendableMoves; // in the event where have to drop card, chose from begining of list
+	private static String dropTileIdx = "1,2,2_flip,3,3_flip,4,4_flip,11,11_flip,12,12_flip,13,14,14_flip,15";
+	private static String optimalTileIdx = "0,5,5_flip,6,6_flip,7,7_flip,8,9,9_flip,10";
 	/**
      * You must modify this constructor to return your student number. This is
      * important, because this is what the code that runs the competition uses to
@@ -58,7 +61,7 @@ public class StudentPlayer extends SaboteurPlayer {
 //        	if(move.getCardPlayed().getName().equalsIgnoreCase("map")) {
 //        		System.out.println("The initial Move is "+move.toPrettyString());
 //        		SaboteurMove m = new SaboteurMove(move.getCardPlayed(), 12,5, player_id);
-//        		System.out.println("Using map "+ m.toPrettyString());
+//        		System.out.println("idx is  "+ m.getCardPlayed().);
 //        		return m;
 //        	}
 //        }
@@ -214,10 +217,101 @@ public class StudentPlayer extends SaboteurPlayer {
        if(isBlocked) {
     	   String bonus = "bonus";
     	   chosenMove = cardFind(legal_moves, bonus, player_id);
+    	   
+    	   if(chosenMove != null) {
+    		   return chosenMove; // if we have bonus card play it, else drop a useless card
+    	   }else {
+    		   // drop bad card
+    		   chosenMove = optimalDrop(boardState);
+    		   return chosenMove;
+    	   }
        }
        
-       // conduct local search
-	   return boardState.getRandomMove();
+       // if not blocked by malus, check if Agent has malus card
+           String malus = "malus";
+           chosenMove = cardFind(legal_moves, malus, player_id);
+           if(chosenMove == null) {
+        	   chosenMove = optimalMove(boardState, player_id);
+        	   return chosenMove;
+           }
+           
+           int distanceToGoal = 5;
+           if(distanceToGoal<3) {
+        	   return chosenMove; // if close to goal and we have malus play it
+           }
+           
+    	   
+    	   
+	       // if the above conditions aren't meet, call optimalMove func
+           chosenMove = optimalMove(boardState, player_id);
+		   return chosenMove;
 	   
    }
+   
+  public static Move optimalMove(SaboteurBoardState bs, int player_id) {
+	  
+//	  Move chosenMove = null;
+//	  ArrayList<SaboteurMove> moves = bs.getAllLegalMoves();
+//	  ArrayList<String> optimal_idx = new ArrayList<String>(Arrays.asList(optimalTileIdx.split(",")));
+//		
+//		// The bad tile's idx are in the list drop_idx, if current hand has one of them, it can be dropped
+//		for(SaboteurMove move: moves) {
+//			SaboteurCard card = move.getCardPlayed();
+//			if(card instanceof SaboteurTile) {
+//				if(optimal_idx.contains(((SaboteurTile) card).getIdx())) {
+//					chosenMove = move;
+//					return chosenMove;
+//				}
+//			}
+//		}
+		
+//		// if optimal tiles not found, drop bad cards
+//		chosenMove = optimalDrop(bs);
+		
+	  
+	  return bs.getRandomMove();
+  }
+  
+// Evaluates current set of moves and returns move that drops the most useless card
+public static Move optimalDrop(SaboteurBoardState bs) {
+	
+	ArrayList<SaboteurMove> moves = bs.getAllLegalMoves();
+	ArrayList<String> drop_idx = new ArrayList<String>(Arrays.asList(dropTileIdx.split(",")));
+	
+	// The bad tile's idx are in the list drop_idx, if current hand has one of them, it can be dropped
+	for(SaboteurMove move: moves) {
+		SaboteurCard card = move.getCardPlayed();
+		if(card instanceof SaboteurTile) {
+			if(drop_idx.contains(((SaboteurTile) card).getIdx())) {
+				System.out.println("Found shit card to drop");
+				return move;
+			}
+		}
+	}
+	
+	// If we don't currently have the bad tile cards in current hand we can drop Map or destroy cards
+	
+	// 1: If the nugget position is known, then any map card can be dropped
+	if(nuggetFound) { 
+		
+		for(SaboteurMove move: moves) {
+			SaboteurCard card = move.getCardPlayed();
+			if(card instanceof SaboteurMap) { 
+				// useless map card found, can be dropped
+				return move;
+			}
+		}
+	}else { // If current hand doesn't have bad tile cards, useless map card, check to see if there is a destroy card
+		
+		for(SaboteurMove move: moves) {
+			SaboteurCard card = move.getCardPlayed();
+			if(card instanceof SaboteurDestroy) { 
+				// useless destroy card found, can be dropped
+				return move;
+			}
+		}
+	}
+	// worst case if no condition is met, drop random
+			return bs.getRandomMove();
+  }
 }
