@@ -1,6 +1,5 @@
 package student_player;
 
-import Saboteur.SaboteurBoard;
 import Saboteur.SaboteurMove;
 import Saboteur.cardClasses.*;
 import boardgame.Move;
@@ -12,24 +11,20 @@ import java.util.*;
 
 /** A player file submitted by a student. */
 public class StudentPlayer extends SaboteurPlayer {
-
-    // timing constants to prevent loop from timing out
-    private static final int TIME_LIMIT_MS = 2000;
-    private static final int GRACE_PERIOD_MS = 1500; //TODO: is this necessary?
-    
-    //private static String optTileIdx = "0,5,5_flip,6,6_flip,7,7_flip,8,9,9_flip,10";
-    private static String dropTileIdx = "1,2,2_flip,3,3_flip,4,4_flip,11,11_flip,12,12_flip,13,14,14_flip,15";
     private ArrayList<SaboteurMove> dropMoves;
     private ArrayList<SaboteurCard> hand;
-    private static final double MALUS_THRESHOLD = 3; //TODO: play to figure out optimal value
-    private static final double DROP_THRESHOLD = 5; //TODO: play to figure out optimal value
-    private static final double DELTA = 0.5; //TODO: play to figure out optimal value
-    private static int playerId;
-    private static int nuggetPos = -1;
-    private static boolean[] playerHiddenRevealed = new boolean[]{false,false,false};
-    private static double[][] distances = MyTools.getPositionDistances(-1,playerHiddenRevealed);
     //Key = MoveCost; Value = ArrayList<Move> of moves with that cost
     private TreeMap<Double, ArrayList<SaboteurMove>> legalMoveCosts;
+
+    private static final String dropTileIdx = "1,2,2_flip,3,3_flip,4,4_flip,11,11_flip,12,12_flip,13,14,14_flip,15";
+    private static final double MALUS_THRESHOLD = 3;
+    private static final double DROP_THRESHOLD = 5;
+
+    private static int playerId;
+    private static int nuggetPos = -1;
+
+    private static boolean[] playerHiddenRevealed = new boolean[]{false,false,false};
+    private static double[][] distances = MyTools.getPositionDistances(-1,playerHiddenRevealed);
     /**
      * You must modify this constructor to return your student number. This is
      * important, because this is what the code that runs the competition uses to
@@ -45,9 +40,9 @@ public class StudentPlayer extends SaboteurPlayer {
      * make decisions.
      */
     public Move chooseMove(SaboteurBoardState bS) {
-        System.out.println("Student Player playing as Player number: "+ bS.getTurnPlayer());
+        System.out.println("Student Player playing as Player number: "+ bS.getTurnPlayer()); //TODO: DELETE
         System.out.println("This is Move #: "+ bS.getTurnNumber());
-        final long START_TIME = System.currentTimeMillis();
+
         SaboteurMove myMove = bS.getRandomMove(); //DEFAULT
 
 
@@ -58,20 +53,19 @@ public class StudentPlayer extends SaboteurPlayer {
         playerId = bS.getTurnPlayer();
         int oppId = 1 - playerId;
 
-        if(bS.getTurnNumber()<=2){ //TODO: VERIFY => new game
+        if(bS.getTurnNumber()<=2){ // => new game
             nuggetPos = -1;
             playerHiddenRevealed = new boolean[]{false,false,false};
         }
 
-        this.hand = bS.getCurrentPlayerCards(); //TODO: necessary?
+        this.hand = bS.getCurrentPlayerCards();
         SaboteurTile[][] hiddenBoard = bS.getHiddenBoard();
         int[][] hiddenIntBoard = bS.getHiddenIntBoard();
 
-        //TODO: should the be function calls or replaced with function body?
         if(nuggetPos==-1) updateHidden(bS, hiddenBoard);
         distances = MyTools.getPositionDistances(nuggetPos,playerHiddenRevealed);
 
-        getDistances(bS.getAllLegalMoves());
+        getMoveDistances(bS.getAllLegalMoves());
         double minDistanceToGoal;
         try{
             minDistanceToGoal = this.legalMoveCosts.firstKey();
@@ -81,19 +75,16 @@ public class StudentPlayer extends SaboteurPlayer {
 
 
         /* 1 Map Heuristic:
-         * If distance to goal/middle is over some threshold + don't already know nugget location
+         * If don't already know nugget location
          *       play MAP card as soon as possible
-         * TODO: investigate if threshold is necessary especially w/r.p.t being blocked
-         *  e.g. add surrounding if statement to skip map card if blocked and within 2 plays from goal
          */
         System.out.println("nuggetPos: "+nuggetPos);
         if(nuggetPos == -1) { //I.e. the nugget is not already discovered
             for (SaboteurCard card : this.hand) {
                 if (card instanceof SaboteurMap) {
-                    for(int i=0; i < playerHiddenRevealed.length; i++){//TODO: investigate order to reveal objectives
+                    for(int i=0; i < playerHiddenRevealed.length; i++){
                         if (!playerHiddenRevealed[i]){
                             myMove = new SaboteurMove(card,SaboteurBoardState.hiddenPos[i][0],SaboteurBoardState.hiddenPos[i][1],playerId);
-                            logging(START_TIME);
                             return getLegalMove(bS, myMove);
                         }
                     }
@@ -109,11 +100,10 @@ public class StudentPlayer extends SaboteurPlayer {
             for(SaboteurCard card : this.hand){
                 if(card instanceof SaboteurBonus){
                     myMove = new SaboteurMove(card,0,0,playerId);
-                    logging(START_TIME);
-                    return getLegalMove(bS, myMove); //ISSUE: if for some reason this isn't a legal move it'll return a random card
+                    return getLegalMove(bS, myMove);
                 }
             }
-            if(this.dropMoves.size() > 0) myMove = this.dropMoves.get(0);
+            if(this.dropMoves.size() > 0) myMove = this.dropMoves.get(0); //if stuck without bonus, drop card
             return getLegalMove(bS, myMove);
         }
 
@@ -133,9 +123,14 @@ public class StudentPlayer extends SaboteurPlayer {
         }
         boolean prepWin = minDistanceToGoal < MALUS_THRESHOLD && bS.getNbMalus(oppId) < reqNumMalus;
         if(numMalus > 0 && ( prepWin|| numMalus > reqNumMalus)) {
-            logging(START_TIME);
-            return getLegalMove(bS, myMove); //ISSUE: if for some reason this isn't a legal move it'll return a random card
+            return getLegalMove(bS, myMove);
         }
+
+
+        /* 4. Tile Heuristic:
+         * 1. prioritize dropping bad cards if far enough away from goal to maximize chance of winning hand
+         * 2. analyse each valid tile move and select optimal
+         */
 
         if(minDistanceToGoal >= DROP_THRESHOLD){
             if(this.dropMoves.size() > 0){
@@ -144,28 +139,25 @@ public class StudentPlayer extends SaboteurPlayer {
             }
         }
 
-
-        /* 4. Tile Heuristic:
-         * 1. USE THRESHOLD to calculate target board location.
-         *  TODO: 2. ONCE selected board location, select tile via looking at maintaining path to origin.
-         */
-        // Return your move to be processed by the server.
         if (minDistanceToGoal != -1) { //Note: necessary because of edge case when no tile cards in deck
+            //Create graph structure to simulate moves
             MyTools.Graph g = new MyTools.Graph(10,hiddenIntBoard, hiddenBoard);
             ArrayList<SaboteurMove> optimalDestMoves = new ArrayList<>();
+
+            // Select moves at ordered subset of optimal tile positions to analyse
             int CUTOFF = 6, ctr=0;
             for(Map.Entry<Double,ArrayList<SaboteurMove>> entry : this.legalMoveCosts.entrySet()){
-                if(ctr >= CUTOFF) break;
+                if(ctr >= CUTOFF) break; //TODO: try without cutoff
                 optimalDestMoves.addAll(entry.getValue());
                 ctr++;
             }
-            //optimalDestMoves.addAll(this) TODO: investigate if should have more than just optimalDest
+            // Analyse each move
             ArrayList<Double> optimalNextMoveCosts = new ArrayList<Double>();
             for(SaboteurMove move : optimalDestMoves){
                 optimalNextMoveCosts.add(g.analyse(move));
             }
-            System.out.println("ANALYSIS COMPLETE");
 
+            // Select optimal move that (i.e. has min cost subsequent neighbours)
             Double minCost = -1.0;
             int minIndex = 0;
             for(int i=0; i<optimalNextMoveCosts.size(); i++){
@@ -177,41 +169,41 @@ public class StudentPlayer extends SaboteurPlayer {
             }
             if(minCost >= 0){
                 myMove = optimalDestMoves.get(minIndex);
-                logging(START_TIME);
                 return getLegalMove(bS, myMove); //ISSUE: if for some reason this isn't a legal move it'll return a random card
             }
         }
-        /* X. Drop Heuristic:
-         * TODO
-         *  if found goal, drop any map cards
+
+        /* 5. Drop Heuristic:
+         * If no optimal tile move, try dropping cards to maximise hand opportunities for next round
          */
         if(this.dropMoves.size() > 0) myMove = this.dropMoves.get(0);
 
         /* X. Destroy Heuristic:
-         * TODO: develop usage + resistance e.g. when to use and how to handle broken paths (affects tile heuristic)
-         *  iDEA: destroy tiles that break path to origin
+         * Ignored, found no decent algorithm to utilize the Destroy mechanic reliably.
+         * Therefore return random move
          */
-
-        //while (System.currentTimeMillis() - START_TIME < TIME_LIMIT_MS - GRACE_PERIOD_MS) {} //TODO: remove while loop and figure out best way to do timeout
         return getLegalMove(bS, myMove);
     }
 
-    //TODO: maybe return mincost + ORDERED list of moves.
-    private void getDistances(ArrayList<SaboteurMove> legalMoves){
+    /**
+     * For each legal move find and store (ordered) cost in TreeMap this.legalMoveCosts
+     * costs determined in terms of end tile location according to distances[][]
+     * Additionally updates dropMoves to include targeted drops
+     * @param legalMoves taken from boardstate.getAllLegalMoves
+     */
+    private void getMoveDistances(ArrayList<SaboteurMove> legalMoves){
         List<String> dropIdx = new ArrayList<String>(Arrays.asList(dropTileIdx.split(",")));
-        //System.out.println("dropIdx's: ");
-        //dropIdx.forEach(idx -> System.out.print(" "+idx));
-        ArrayList<String> cardsToBeDopped = new ArrayList<>();
+        ArrayList<String> cardsToBeDropped = new ArrayList<>();
+
         for(SaboteurMove move : legalMoves){
             SaboteurCard card = move.getCardPlayed();
-            //String name = card.getName();
-            if(card instanceof SaboteurTile){ //TODO: make sure the casting doesn't create an issue in getCardPlayed()
+            if(card instanceof SaboteurTile){
+                //I.e. determined to be bad tile
                 if(dropIdx.contains(((SaboteurTile) card).getIdx())){
-                    //System.out.println("Dropping Move: "+name);
-                    cardsToBeDopped.add(card.getName());
+                    cardsToBeDropped.add(card.getName());
                     continue;
                 }
-                //System.out.println("Adding Move: "+name);
+
                 int[] pos = move.getPosPlayed();
                 double cost = distances[pos[0]][pos[1]];
                 if (this.legalMoveCosts.containsKey(cost)){
@@ -222,35 +214,33 @@ public class StudentPlayer extends SaboteurPlayer {
                     this.legalMoveCosts.put(cost,moves);
                 }
             } else if(card instanceof SaboteurDestroy){
-                cardsToBeDopped.add(card.getName());
+                cardsToBeDropped.add(card.getName());
             }else if(card instanceof  SaboteurMap && nuggetPos >-1){
-                cardsToBeDopped.add(0,card.getName());
+                cardsToBeDropped.add(0,card.getName());
             }
         }
+
         for(int i=0; i<this.hand.size(); i++){
-            if(cardsToBeDopped.contains(this.hand.get(i).getName())){
+            if(cardsToBeDropped.contains(this.hand.get(i).getName())){
                 this.dropMoves.add(new SaboteurMove(new SaboteurDrop(), i, 0, playerId ));
             }
         }
     }
 
-    private static void logging(long START_TIME){
-        final long END_TIME = System.currentTimeMillis();
-        System.out.println("DURATION OF MOVE (ms) = "+(END_TIME - START_TIME));
-    }
-
-
+    /**
+     * @param bS original BoardState from server
+     * @param move prospective move I want to play
+     * @return randomLegalMove if move is illegal
+     */
     private static SaboteurMove getLegalMove(SaboteurBoardState bS, SaboteurMove move){
-        if(!bS.isLegal(move)) System.out.println("\t ERROR: Illegal Move "+move.getCardPlayed().getName()+" At "+move.getPosPlayed()); //TODO: remove logging
         return bS.isLegal(move) ? move : bS.getRandomMove();
     }
 
     /**
-     * Finds the index of the nugget within the hidden hidden cards
-     * //TODO: investigate potentiall issue of nuggetPos = -1 despite nugget having been found...
+     * Finds the index of the (discovered) nugget within the hidden hidden cards
+     * nuggetPos: -1 for not found, 0-2 for index of SaboteurBoardState.hiddenPos located at
      * @param bS
      * @param hiddenBoard
-     * @return int -1 for not found, 0-2 for index of SaboteurBoardState.hiddenPos located at
      */
 	private static void updateHidden(SaboteurBoardState bS, SaboteurTile[][] hiddenBoard){
         int pos = -1,numHidden = 0;
@@ -269,13 +259,13 @@ public class StudentPlayer extends SaboteurPlayer {
             }
         }
     	nuggetPos = pos;
+
     	//If only 1 remaining hidden tile and nugget hasn't been found can assume nugget is at that hidden tile
     	if(nuggetPos==-1 && numHidden==1){
     	    for(int h=0;h<3; h++){
     	        if(!playerHiddenRevealed[h]){
     	            nuggetPos = h;
     	            playerHiddenRevealed[h] = true;
-    	            System.out.println("!ASSUMING NUGGET AT POS = "+h);
     	            return;
                 }
             }
