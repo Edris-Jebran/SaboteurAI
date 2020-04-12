@@ -89,16 +89,18 @@ public class StudentPlayer extends SaboteurPlayer {
         		//return chosenMove;
         		
         	}else { // else see if can play map card
+        		System.out.println("Tring to find map card");
         		chosenMove = mapFind(); // returns move to play if map card is found else null
-        		if(chosenMove != null) {
-        			//return chosenMove;
-        		}else {
+        		if(chosenMove == null) {
         			//return 
+        			System.out.println("Map card not found, local serach");
         			chosenMove = localSearchFunc();
+        		
         		}
         	}
         }else { // nugget position is known, conduct localSerach for best move
-        
+        	
+        	System.out.println("Nugget is known, find optimal tile");
         	chosenMove = localSearchFunc();
         	//return chosenMove;
         	
@@ -270,23 +272,36 @@ public class StudentPlayer extends SaboteurPlayer {
 				  if(!optimalCards.contains(card)) {
 					  optimalCards.add(card);
 				  }
+				  optimalMoves.add(move);
+				
 			  }
 		  }
 	  }
 	  System.out.println("There were "+optimalMoves.size()+" unique good moves");
-	  System.exit(0);
+	 // System.exit(0);
 	  // If we have the good cards in hand, analyze the boardstate and place tile accordingly to get close to goal
-	  if(optimalCards.size()>0) {
+	  if(optimalMoves.size()>0) {
 		  // ArrayList optimalMoves currently contains all possible moves that the good tiles can do
 		  // need to further trim the list to exclude moves for bad positions
 		  // TODO: Implement algorithm to select best tile position
-		  mv = optimalMoves.get(((int)(Math.random()*optimalMoves.size())));
+		  ArrayList<SaboteurMove> optimized_moves = new ArrayList<SaboteurMove>();
+		  int xBound = 5, yBound = 9;
+		  for(SaboteurMove move: optimalMoves) {
+			  int[] pos = move.getPosPlayed(); // position where it can be played x,y
+			  if(pos[0] >= xBound && pos[1]<= yBound) {
+				  optimized_moves.add(move);
+			  }
+		  }
+		  
+		  mv = optimized_moves.get(((int)(Math.random()*optimized_moves.size())));
+		  System.out.println("Optimized Move found:----> "+mv.toPrettyString());
 		  
 		  
 	  }else {
 		  
-		// If no good tile was found to be placed on the board, drop worst cards
+		  // If no good tile was found to be placed on the board, drop worst cards
 		  // bad tiles -> destroy card -> unused map
+		  System.out.println("Finding bad tile");
 	      int i = 0, badTileIndex = -1;
 	      for(SaboteurCard card: hand) {
 	    	  if(card instanceof SaboteurTile) {
