@@ -20,7 +20,7 @@ public class StudentPlayer extends SaboteurPlayer {
 	private int[][] currentBoard;
 	private static int playerId;
 	private static double distanceToGoal = 14*14;
-	private static final int THRESHOLD_DISTANCE = 3;
+	private static final int THRESHOLD_DISTANCE = 5;
 	
 	private static int numMovesDone = 0;
 	private static boolean nuggetFound = false;
@@ -157,6 +157,7 @@ public class StudentPlayer extends SaboteurPlayer {
 			   }
 		   }
 	   }
+	   System.out.println("Distance to goal is: "+distanceToGoal);
 	   return moveChosen;
    }
    
@@ -243,7 +244,7 @@ public class StudentPlayer extends SaboteurPlayer {
    		   }   
    	   }
    	   // if nugget found and distance to goal < threshold or numMalus >2, play malus
-   	   if((numMalus>0 && distanceToGoal<=THRESHOLD_DISTANCE) || numMalus>2) {
+   	   if((numMalus>0 && distanceToGoal<=THRESHOLD_DISTANCE) || numMalus>1) {
    		   
    		String malus = "malus";
         chosenMove = cardFind(malus);
@@ -422,6 +423,7 @@ public static double euclideanDistance(SaboteurMove move) {
 	// between goal position and position of new tile, else return 14*14
 	int[] pos = move.getPosPlayed();
 	double temp = Math.pow(Math.abs(goalPosition[0]-pos[0]), 2)+ Math.pow(Math.abs(goalPosition[1]-pos[1]), 2);
+	
 	double distance = Math.sqrt(temp);
 	
 	
