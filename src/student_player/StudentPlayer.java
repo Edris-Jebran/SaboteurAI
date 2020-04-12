@@ -19,7 +19,7 @@ public class StudentPlayer extends SaboteurPlayer {
 	private static ArrayList<SaboteurMove> legal_moves;
 	private int[][] currentBoard;
 	private static int playerId;
-	private static double distanceToGoal;
+	private static double distanceToGoal = 14*14;
 	private static final int THRESHOLD_DISTANCE = 3;
 	
 	private static int numMovesDone = 0;
@@ -107,7 +107,13 @@ public class StudentPlayer extends SaboteurPlayer {
         }
         final long END_TIME = System.currentTimeMillis();
         System.out.println("DURATION OF MOVE (ms) = "+(END_TIME - START_TIME));
-        return chosenMove;
+        
+        if(bs.isLegal((SaboteurMove)chosenMove)) {
+        	return chosenMove;
+        }else {
+        	System.out.println("Yo wtf, move wasn't legal");
+        	return bs.getRandomMove();
+        }
     }
     
    /* 
@@ -293,8 +299,14 @@ public class StudentPlayer extends SaboteurPlayer {
 			  }
 		  }
 		  
-		  mv = optimized_moves.get(((int)(Math.random()*optimized_moves.size())));
-		  System.out.println("Optimized Move found:----> "+mv.toPrettyString());
+		  if(optimized_moves.size()>0) {
+			  mv = getMinMove(optimized_moves);
+			  System.out.println("Optimized Move found:----> "+mv.toPrettyString());  
+		  }else {
+			  mv = getMinMove(optimalMoves);
+			  System.out.println("Chosing one of the unoptimized optimal cards:----> "+mv.toPrettyString());
+			  
+		  }
 		  
 		  
 	  }else {
@@ -405,9 +417,40 @@ public static Move optimalDrop() {
  * 
  */
 public static double euclideanDistance(SaboteurMove move) {
+	// relaxed implementation
+	// if there is a path from origin to the position where tile will be placed, return euclidan distance
+	// between goal position and position of new tile, else return 14*14
+	int[] pos = move.getPosPlayed();
+	double temp = Math.pow(Math.abs(goalPosition[0]-pos[0]), 2)+ Math.pow(Math.abs(goalPosition[1]-pos[1]), 2);
+	double distance = Math.sqrt(temp);
 	
 	
-	return 0;
+	return distance;
+}
+public static SaboteurMove getMinMove(ArrayList<SaboteurMove> moves) {
+	
+	ArrayList<Double> distances = new ArrayList<Double>();
+	for(SaboteurMove move: moves) {
+		distances.add(euclideanDistance(move));
+	}
+	
+	int minIndex = -1;
+	int i=0;
+	double min = Integer.MAX_VALUE;
+	for(Double dist: distances) {
+		if(dist<min) {
+			min = dist;
+			minIndex = i;
+		}
+		i++;
+	}
+	System.out.println("The min distance is returned by "+moves.get(minIndex).toPrettyString());
+	if(distanceToGoal>min) {
+		distanceToGoal = min;
+		System.out.println("Distance to goal is "+distanceToGoal);
+	}
+	return moves.get(minIndex);
+	
 }
 }
 
