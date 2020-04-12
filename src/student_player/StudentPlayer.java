@@ -17,6 +17,7 @@ public class StudentPlayer extends SaboteurPlayer {
 	private static SaboteurBoardState bs;
 	private static ArrayList<SaboteurCard> hand;
 	private static ArrayList<SaboteurMove> legal_moves;
+	private int[][] currentBoard;
 	private static int playerId;
 	private static double distanceToGoal;
 	private static final int THRESHOLD_DISTANCE = 3;
@@ -30,7 +31,7 @@ public class StudentPlayer extends SaboteurPlayer {
 	private static int goalPosition[] = {student_originPos+7,student_originPos}; // Initially set to the middle hidden tile, updated after map used
 	
 	private static String dropTileIdx = "1,2,2_flip,3,3_flip,4,4_flip,11,11_flip,12,12_flip,13,14,14_flip,15";
-	private static String optimalTileIdx = "0,5,5_flip,6,6_flip,7,7_flip,8,9,9_flip,10";
+	private static String optimalTileIdx = "0,6,6_flip,8,5,5_flip,7,7_flip,9,9_flip,10";
 	
 	
 	/**
@@ -60,10 +61,9 @@ public class StudentPlayer extends SaboteurPlayer {
         legal_moves = boardState.getAllLegalMoves();
         playerId = boardState.getTurnPlayer();
         distanceToGoal = 5;
-        
-        
-//        int [][] board = boardState.getHiddenIntBoard(); // curent state of the board, can't see hidden objects
-//        SaboteurTile[][] curHiddenBoard = boardState.getHiddenBoard();
+        currentBoard = boardState.getHiddenIntBoard(); // curent state of the board, can't see hidden objects
+
+        //        SaboteurTile[][] curHiddenBoard = boardState.getHiddenBoard();
         
         
         /*
@@ -259,10 +259,29 @@ public class StudentPlayer extends SaboteurPlayer {
       
 	  SaboteurMove mv = null;
 	  
+	  // Get list of all good cards that can be played
+	  ArrayList<SaboteurCard> optimalCards = new ArrayList<SaboteurCard>();
+	  ArrayList<SaboteurMove> optimalMoves = new ArrayList<SaboteurMove>();
 	  
-	  boolean goodMove = false;
-	  
-	  if(goodMove) {
+	  for(SaboteurMove move: legal_moves) {
+		  SaboteurCard card = move.getCardPlayed();
+		  if(card instanceof SaboteurTile) {
+			  if(optimalTile_idx.contains(((SaboteurTile) card).getIdx())) {
+				  if(!optimalCards.contains(card)) {
+					  optimalCards.add(card);
+				  }
+			  }
+		  }
+	  }
+	  System.out.println("There were "+optimalMoves.size()+" unique good moves");
+	  System.exit(0);
+	  // If we have the good cards in hand, analyze the boardstate and place tile accordingly to get close to goal
+	  if(optimalCards.size()>0) {
+		  // ArrayList optimalMoves currently contains all possible moves that the good tiles can do
+		  // need to further trim the list to exclude moves for bad positions
+		  // TODO: Implement algorithm to select best tile position
+		  mv = optimalMoves.get(((int)(Math.random()*optimalMoves.size())));
+		  
 		  
 	  }else {
 		  
@@ -365,5 +384,15 @@ public static Move optimalDrop() {
 	// worst case if no condition is met, drop random
 			return bs.getRandomMove();
   }
+
+/*
+ * use current int board to find the euclidean distance between tunnel and nugget given if we play this move
+ * 
+ */
+public static double euclideanDistance(SaboteurMove move) {
+	
+	
+	return 0;
+}
 }
 
