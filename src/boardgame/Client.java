@@ -94,6 +94,9 @@ public class Client implements Runnable {
                 board.forceWinner(Board.DRAW);
             } else if (winner != "UNDECIDED") {
                 board.forceWinner(Integer.parseInt(winner));
+                if(Integer.parseInt(winner) == playerID && (player.getName().equals("260742799"))){
+                    System.out.println("STUDENT PLAYER WON!");
+                }
             }
 
             BoardState bs = board.getBoardState();

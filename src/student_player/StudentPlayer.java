@@ -7,12 +7,19 @@ import Saboteur.SaboteurPlayer;
 import Saboteur.SaboteurBoardState;
 import Saboteur.SaboteurMove;
 
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.math.*;
+import java.util.*;
+
 
 /** A player file submitted by a student. */
 public class StudentPlayer extends SaboteurPlayer {
+	
+	private static SaboteurBoardState bs;
+	private static ArrayList<SaboteurCard> hand;
+	private static ArrayList<SaboteurMove> legal_moves;
+	private static int playerId;
+	private static double distanceToGoal;
+	private static final int THRESHOLD_DISTANCE = 3;
 	
 	private static int numMovesDone = 0;
 	private static boolean nuggetFound = false;
@@ -22,9 +29,10 @@ public class StudentPlayer extends SaboteurPlayer {
 	private static boolean[] student_hiddenRevealed = {false,false,false};
 	private static int goalPosition[] = {student_originPos+7,student_originPos}; // Initially set to the middle hidden tile, updated after map used
 	
-	private static ArrayList<SaboteurMove> expendableMoves; // in the event where have to drop card, chose from begining of list
 	private static String dropTileIdx = "1,2,2_flip,3,3_flip,4,4_flip,11,11_flip,12,12_flip,13,14,14_flip,15";
 	private static String optimalTileIdx = "0,5,5_flip,6,6_flip,7,7_flip,8,9,9_flip,10";
+	
+	
 	/**
      * You must modify this constructor to return your student number. This is
      * important, because this is what the code that runs the competition uses to
@@ -40,34 +48,23 @@ public class StudentPlayer extends SaboteurPlayer {
      * make decisions.
      */
     public Move chooseMove(SaboteurBoardState boardState) {
+    	final long START_TIME = System.currentTimeMillis();
        
         System.out.println("Student player acting as player number: "+boardState.getTurnPlayer());
         
-        // Get all data necessary to paint an image of what the board looks like, curhand
-        // End goal is to do a local search and return the best possible move.
-        
         Move chosenMove = null;
         
-        int player_id = boardState.getTurnPlayer();
+        // setting global variables/data structures to be used by methods
+        bs = boardState;
+        hand = boardState.getCurrentPlayerCards();
+        legal_moves = boardState.getAllLegalMoves();
+        playerId = boardState.getTurnPlayer();
+        distanceToGoal = 5;
         
-        // get all legal moves and choose the best
-        ArrayList<SaboteurMove> legal_moves = boardState.getAllLegalMoves();
-        ArrayList<SaboteurCard> curHand = boardState.getCurrentPlayerCards();
         
-        int [][] board = boardState.getHiddenIntBoard(); // curent state of the board, can't see hidden objects
-        SaboteurTile[][] curHiddenBoard = boardState.getHiddenBoard();
+//        int [][] board = boardState.getHiddenIntBoard(); // curent state of the board, can't see hidden objects
+//        SaboteurTile[][] curHiddenBoard = boardState.getHiddenBoard();
         
-//        for(SaboteurMove move: legal_moves) {
-//        	if(move.getCardPlayed().getName().equalsIgnoreCase("map")) {
-//        		System.out.println("The initial Move is "+move.toPrettyString());
-//        		SaboteurMove m = new SaboteurMove(move.getCardPlayed(), 12,5, player_id);
-//        		System.out.println("idx is  "+ m.getCardPlayed().);
-//        		return m;
-//        	}
-//        }
-//        
-//        System.exit(0);
-//        return chosenMove;
         
         /*
          * Heuristic: 
@@ -82,29 +79,33 @@ public class StudentPlayer extends SaboteurPlayer {
         // If nuggetFound is false, call nuggetFind which will see if nugget was found and updates goal
         // if no nugget is found search cards for Map card and play it
         if(!nuggetFound) {
-        	int nuggetTile = nuggetFind(boardState); // If prreviously, Map revealed nugget, this updates flag
+        	int nuggetTile = nuggetFind(); // If prreviously, Map revealed nugget, this updates flag
         	
         	if(nuggetTile != -1) { // nugget position is known so update goalPosition and call localSearch
         		int i = nuggetTile;
         		goalPosition[0] = student_hiddenPos[i][0];
         		goalPosition[1] = student_hiddenPos[i][1];
-        		chosenMove = localSearchFunc(boardState, player_id);
-        		return chosenMove;
+        		chosenMove = localSearchFunc();
+        		//return chosenMove;
         		
         	}else { // else see if can play map card
-        		chosenMove = mapFind(curHand, player_id); // returns move to play if map card is found else null
+        		chosenMove = mapFind(); // returns move to play if map card is found else null
         		if(chosenMove != null) {
-        			return chosenMove;
+        			//return chosenMove;
         		}else {
-        			return localSearchFunc(boardState, player_id);
+        			//return 
+        			chosenMove = localSearchFunc();
         		}
         	}
         }else { // nugget position is known, conduct localSerach for best move
         
-        	chosenMove = localSearchFunc(boardState, player_id);
-        	return chosenMove;
+        	chosenMove = localSearchFunc();
+        	//return chosenMove;
         	
         }
+        final long END_TIME = System.currentTimeMillis();
+        System.out.println("DURATION OF MOVE (ms) = "+(END_TIME - START_TIME));
+        return chosenMove;
     }
     
    /* 
@@ -116,13 +117,13 @@ public class StudentPlayer extends SaboteurPlayer {
     * @return: If map card is found, it returns a move and updates the corresponding hiddenReveal
     * 
     * */
-   public static Move mapFind(ArrayList<SaboteurCard> cards, int playerId) {
+   public static Move mapFind() {
 	   
 	   Move moveChosen = null;  
        boolean mapCardFound = false;
        SaboteurCard  mapCard = null;
        
-	   for(SaboteurCard card: cards) {     	
+	   for(SaboteurCard card: hand) {     	
            if(card instanceof SaboteurMap) {
            	System.out.println("Map card found: "+card.getName());
            	mapCardFound = true;
@@ -162,7 +163,7 @@ public class StudentPlayer extends SaboteurPlayer {
     * @return: If card is found, it returns move, else null
     * 
     * */
-   public static Move cardFind(ArrayList<SaboteurMove> legal_moves, String cardName, int playerId) {
+   public static Move cardFind(String cardName) {
 	   
 	   Move moveChosen = null;  
        
@@ -184,10 +185,10 @@ public class StudentPlayer extends SaboteurPlayer {
   * @return: If nugget is hidden return -1, else the position 0,1,2 from which goal position can be computed
   * 
   */
- public static int nuggetFind(SaboteurBoardState boardState) {
+ public static int nuggetFind() {
 	   
 	   for(int i=0; i<2;i++) {
-		   SaboteurTile hiddenTile = boardState.getHiddenBoard()[boardState.hiddenPos[i][0]][boardState.hiddenPos[i][1]];
+		   SaboteurTile hiddenTile = bs.getHiddenBoard()[bs.hiddenPos[i][0]][bs.hiddenPos[i][1]];
 		   if(hiddenTile.getIdx().equalsIgnoreCase("nugget")) {
 			   // set nuggetFound to true
 			   System.out.println("**********************Found the freaking nugget*********************");
@@ -202,9 +203,7 @@ public class StudentPlayer extends SaboteurPlayer {
     //@param: boardState, the current state of the board, with givenGoal state
     //@param: curHand, the cards currently in the AI agents possesion
     //@return: best possible move that can be done
-   public static Move localSearchFunc(SaboteurBoardState boardState, int player_id) {
-	   
-	   ArrayList<SaboteurMove> legal_moves = boardState.getAllLegalMoves();
+   public static Move localSearchFunc() {
 	   
 	   Move chosenMove = null;
 	   /*
@@ -213,73 +212,125 @@ public class StudentPlayer extends SaboteurPlayer {
 	   * 
 	   */
 	   
-       boolean isBlocked = boardState.getNbMalus(player_id)>0; // if the opponent has played malus, isBlocked is true
+       boolean isBlocked = bs.getNbMalus(playerId)>0; // if the opponent has played malus, isBlocked is true
        if(isBlocked) {
     	   String bonus = "bonus";
-    	   chosenMove = cardFind(legal_moves, bonus, player_id);
+    	   System.out.println("Player blocked, gotta play bonus or drop");
+    	   chosenMove = cardFind(bonus);
     	   
     	   if(chosenMove != null) {
     		   return chosenMove; // if we have bonus card play it, else drop a useless card
     	   }else {
     		   // drop bad card
-    		   chosenMove = optimalDrop(boardState);
+    		   chosenMove = optimalDrop();
     		   return chosenMove;
     	   }
        }
        
        // if not blocked by malus, check if Agent has malus card
-           String malus = "malus";
-           chosenMove = cardFind(legal_moves, malus, player_id);
-           if(chosenMove == null) {
-        	   chosenMove = optimalMove(boardState, player_id);
-        	   return chosenMove;
-           }
-           
-           int distanceToGoal = 5;
-           if(distanceToGoal<3) {
-        	   return chosenMove; // if close to goal and we have malus play it
-           }
-           
-    	   
-    	   
-	       // if the above conditions aren't meet, call optimalMove func
-           chosenMove = optimalMove(boardState, player_id);
-		   return chosenMove;
+   	   int numMalus = 0;
+   	   for(SaboteurCard card: hand) {
+   		   if(card instanceof SaboteurMalus) {
+   			   numMalus++;
+   		   }   
+   	   }
+   	   // if nugget found and distance to goal < threshold or numMalus >2, play malus
+   	   if((numMalus>0 && distanceToGoal<=THRESHOLD_DISTANCE) || numMalus>2) {
+   		   
+   		String malus = "malus";
+        chosenMove = cardFind(malus);
+        
+        if(chosenMove == null) {
+     	   chosenMove = optimalMove();
+     	   return chosenMove;
+          }   
+   	   }
+   	    
+       // if the above conditions aren't meet, call optimalMove func
+       chosenMove = optimalMove();
+	   return chosenMove;
 	   
    }
    
-  public static Move optimalMove(SaboteurBoardState bs, int player_id) {
+  public static Move optimalMove() {
 	  
-//	  Move chosenMove = null;
-//	  ArrayList<SaboteurMove> moves = bs.getAllLegalMoves();
-//	  ArrayList<String> optimal_idx = new ArrayList<String>(Arrays.asList(optimalTileIdx.split(",")));
-//		
-//		// The bad tile's idx are in the list drop_idx, if current hand has one of them, it can be dropped
-//		for(SaboteurMove move: moves) {
-//			SaboteurCard card = move.getCardPlayed();
-//			if(card instanceof SaboteurTile) {
-//				if(optimal_idx.contains(((SaboteurTile) card).getIdx())) {
-//					chosenMove = move;
-//					return chosenMove;
-//				}
-//			}
-//		}
-		
-//		// if optimal tiles not found, drop bad cards
-//		chosenMove = optimalDrop(bs);
-		
+	  ArrayList<String> drop_idx = new ArrayList<String>(Arrays.asList(dropTileIdx.split(",")));
+	  ArrayList<String> optimalTile_idx = new ArrayList<String>(Arrays.asList(optimalTileIdx.split(",")));
+      
+	  SaboteurMove mv = null;
 	  
-	  return bs.getRandomMove();
+	  
+	  boolean goodMove = false;
+	  
+	  if(goodMove) {
+		  
+	  }else {
+		  
+		// If no good tile was found to be placed on the board, drop worst cards
+		  // bad tiles -> destroy card -> unused map
+	      int i = 0, badTileIndex = -1;
+	      for(SaboteurCard card: hand) {
+	    	  if(card instanceof SaboteurTile) {
+	    		  if(drop_idx.contains(((SaboteurTile) card).getIdx())) {
+	    	      	badTileIndex = i;
+	    	      	break;
+	    	      	}
+	    	  }
+	      	i++;
+	      }
+	    
+	      if(badTileIndex != -1) {
+	    	 System.out.println("Optimal move -> dropping: "+hand.get(badTileIndex).getName());
+	         mv = (new SaboteurMove(new SaboteurDrop(), badTileIndex, 0, playerId));
+	          
+	      }else { // If bad tile was not found, conduct search for Destroy card, or Map card
+
+	      	 int j = 0, destroyIndex = -1, mapIndex = -1;
+	         for(SaboteurCard card: hand) {
+	      
+	       	  if(card instanceof SaboteurDestroy) {
+	       	      destroyIndex = j;
+	       	      break;
+	       	      	}
+	       	  if(card instanceof SaboteurMap) {
+	       		// if no destroy card, we can drop map card
+		      	mapIndex = j;
+	       	  }
+	         	j++;
+	         }
+
+	         // if Destroy card was found chose move that will drop it
+	       
+	         if(destroyIndex != -1) {
+	        	System.out.println("Optimal move -> dropping: "+hand.get(destroyIndex).getName());
+	        	mv = (new SaboteurMove(new SaboteurDrop(), destroyIndex, 0, playerId));
+	            
+	         } // else see if there is a map card to drop
+	         else if(mapIndex != -1) {
+	        	System.out.println("Optimal move -> dropping: "+hand.get(mapIndex).getName());
+	        	mv = (new SaboteurMove(new SaboteurDrop(), mapIndex, 0, playerId));
+	                   	 
+	         }else {
+	        	 
+	        	 mv = bs.getRandomMove();
+	             System.out.println("random move "+mv.toPrettyString());
+	        	 
+	         }  
+	      }		  
+	  }
+	System.out.println("Reached the end");
+    return mv;
+           
   }
   
 // Evaluates current set of moves and returns move that drops the most useless card
-public static Move optimalDrop(SaboteurBoardState bs) {
+public static Move optimalDrop() {
 	
-	ArrayList<SaboteurMove> moves = bs.getAllLegalMoves();
+	//ArrayList<SaboteurMove> moves = bs.getAllLegalMoves();
 	ArrayList<String> drop_idx = new ArrayList<String>(Arrays.asList(dropTileIdx.split(",")));
 	
 	// The bad tile's idx are in the list drop_idx, if current hand has one of them, it can be dropped
-	for(SaboteurMove move: moves) {
+	for(SaboteurMove move: legal_moves) {
 		SaboteurCard card = move.getCardPlayed();
 		if(card instanceof SaboteurTile) {
 			if(drop_idx.contains(((SaboteurTile) card).getIdx())) {
@@ -294,7 +345,7 @@ public static Move optimalDrop(SaboteurBoardState bs) {
 	// 1: If the nugget position is known, then any map card can be dropped
 	if(nuggetFound) { 
 		
-		for(SaboteurMove move: moves) {
+		for(SaboteurMove move: legal_moves) {
 			SaboteurCard card = move.getCardPlayed();
 			if(card instanceof SaboteurMap) { 
 				// useless map card found, can be dropped
@@ -303,7 +354,7 @@ public static Move optimalDrop(SaboteurBoardState bs) {
 		}
 	}else { // If current hand doesn't have bad tile cards, useless map card, check to see if there is a destroy card
 		
-		for(SaboteurMove move: moves) {
+		for(SaboteurMove move: legal_moves) {
 			SaboteurCard card = move.getCardPlayed();
 			if(card instanceof SaboteurDestroy) { 
 				// useless destroy card found, can be dropped
@@ -315,3 +366,4 @@ public static Move optimalDrop(SaboteurBoardState bs) {
 			return bs.getRandomMove();
   }
 }
+
